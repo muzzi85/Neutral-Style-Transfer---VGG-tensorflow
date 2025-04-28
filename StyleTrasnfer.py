@@ -2,28 +2,20 @@ from pathlib import Path
 import requests
 import os
 import random
-from PIL import Image
 import matplotlib.pyplot as plt
 from tqdm.auto import tqdm
+import numpy as np
+import tensorflow as tf
+from PIL import Image, ImageChops 
+from diffusers.utils import load_image
 
-# useful files
-files = {
-    "images.zip":"https://github.com/Q-b1t/nst_demo_resources/raw/main/images/images.zip",
-}
-# create the import directory
-imports_path = Path("imports")
-imports_path.mkdir(exist_ok=True,parents=True)
-paths = dict()
-
-# import the files
-for f,raw in files.items():
-  new_path = imports_path / f
-  req = requests.get(raw)
-  with open(new_path,"wb") as fl:
-    fl.write(req.content)
-    print(f"File {raw} written to {new_path},")
-    paths[f] = new_path
-
+### TF model libs
+from tensorflow.keras.models import Model
+from tensorflow.keras.applications import VGG19
+from tensorflow.keras.applications.vgg19 import preprocess_input
+from tensorflow.keras.preprocessing.image import load_img,img_to_array
+from tensorflow.keras.optimizers import SGD
+from tensorflow.keras.optimizers.schedules import ExponentialDecay
 
 
 # get the image paths as a list
@@ -34,11 +26,11 @@ content_path = image_path / "content"
 style_images = list(style_path.glob("*.jpg"))
 content_images = list(content_path.glob("*.jpg"))
 
-
-
+## choose random images for test
 style_image = random.choice(style_images)
 content_image = random.choice(content_images)
 
+## plot the images
 plt.figure(figsize = (10,5))
 plt.subplot(1,2,1)
 plt.title("Content Image")
@@ -48,9 +40,6 @@ plt.subplot(1,2,2)
 plt.title("Style Image")
 plt.imshow(plt.imread(style_image))
 plt.axis(False)
-
-import numpy as np
-import tensorflow as tf
 
 
 # compute the gram matrix of the features
@@ -71,43 +60,6 @@ def style_cost_function(style_image,generated_image):
 
 def content_cost_function(base_image,generated_image):
   return tf.reduce_sum(tf.square(tf.subtract(generated_image,base_image)))
-
-
-### TF model 
-
-from tensorflow.keras.models import Model
-from tensorflow.keras.applications import VGG19
-from tensorflow.keras.applications.vgg19 import preprocess_input
-from tensorflow.keras.preprocessing.image import load_img,img_to_array
-from tensorflow.keras.optimizers import SGD
-from tensorflow.keras.optimizers.schedules import ExponentialDecay
-
-pretrained_vgg_model = VGG19(include_top = False, weights="imagenet")
-
-pretrained_vgg_model.summary()
-
-# extract the layers' name (for reference only)
-model_layers = [layer.name for layer in pretrained_vgg_model.layers]
-model_layers
-# create a dictionary that maps the layers name to each feature extractor
-model_outputs = {layer.name : layer.output for layer in pretrained_vgg_model.layers}
-# feature extractor
-feature_extractor = Model(inputs=pretrained_vgg_model.inputs, outputs=model_outputs)
-
-# define the style layers
-style_layers = [
-    "block1_conv1",
-    "block2_conv1",
-    "block3_conv1",
-    "block4_conv1",
-    "block5_conv1",
-    ]
-# define the content layer
-content_layer = "block5_conv2"
-
-# define the style and content weights
-content_weight = 2.5e-8
-style_weight = 1.0e-6
 
 def loss_function(combination_image, base_image, style_reference_image):
   # 1. Combine all the images in the same tensioner.
@@ -147,21 +99,6 @@ def compute_loss_and_grads(generated_image, base_image, style_image):
     grads = tape.gradient(loss, generated_image)
     return loss, grads
 
-    """
-def preprocess_image(image_path):
-  # load the image into a tensot
-  img = load_img(image_path, target_size=(img_nrows, img_ncols))
-  # turn the image into a numpy array
-  img = img_to_array(img)
-  # add a batch dimention
-  img = np.expand_dims(img, axis=0)
-  # preprocess according to the vgg model's specification
-  img = preprocess_input(img)
-  return tf.convert_to_tensor(img)
-
-"""
-
-
 def preprocess_image(img):
   # load the image into a tensot
   img = img.resize((img_ncols,img_nrows))
@@ -187,26 +124,42 @@ def deprocess_image(x):
     x = np.clip(x, 0, 255).astype("uint8")
     return x
 
+## define the VGG model
+pretrained_vgg_model = VGG19(include_top = False, weights="imagenet")
+pretrained_vgg_model.summary()
+
+# extract the layers' name (for reference only)
+model_layers = [layer.name for layer in pretrained_vgg_model.layers]
+model_layers
+# create a dictionary that maps the layers name to each feature extractor
+model_outputs = {layer.name : layer.output for layer in pretrained_vgg_model.layers}
+# feature extractor
+feature_extractor = Model(inputs=pretrained_vgg_model.inputs, outputs=model_outputs)
+
+# define the style layers
+style_layers = [
+    "block1_conv1",
+    "block2_conv1",
+    "block3_conv1",
+    "block4_conv1",
+    "block5_conv1",
+    ]
+# define the content layer
+content_layer = "block5_conv2"
+
+# define the style and content weights
+content_weight = 2.5e-8
+style_weight = 1.0e-6
+
 # store the loss curve values
 loss_values = list()
 
-from PIL import Image, ImageChops 
-from diffusers.utils import load_image
-## test 1 image 
-image_path = "/home/muzzi/Image2image generation/Anomaly detection images/customer data/1 (402)_insulator_4.jpg"
-style_path = "/home/muzzi/Image2image generation/edges.jpg"
-
 content_image = load_image(image_path).convert('RGB')
-
 style_image = load_image(style_path).convert('RGB')
-
 base_pil_image = Image.open(image_path)
 generated_pil_image = Image.open(image_path)
 style_pil_image = Image.open(style_path)
-
 width, height = base_pil_image.size
-
-
 img_nrows = 400
 img_ncols = int(width * img_nrows / height)
 
@@ -222,8 +175,9 @@ combination_image = tf.Variable(preprocess_image(generated_pil_image))
 
 print(base_image.shape,style_reference_image.shape,combination_image.shape)
 
-epochs = 4
 
+## training phase
+epochs = 4
 for i in tqdm(range(epochs)):
     loss, grads = compute_loss_and_grads(
         combination_image, base_image, style_reference_image
@@ -240,6 +194,8 @@ plt.ylabel("Loss")
 plt.xlabel("Epochs")
 
 
+
+### test the model by generating images 
 generated_image_numpy = combination_image.numpy()
 generated_image_numpy = deprocess_image(generated_image_numpy)
 #generated_image_numpy = np.squeeze(generated_image_numpy,axis = 0)
