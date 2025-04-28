@@ -8,7 +8,6 @@ import numpy as np
 import tensorflow as tf
 from PIL import Image, ImageChops 
 from diffusers.utils import load_image
-
 ### TF model libs
 from tensorflow.keras.models import Model
 from tensorflow.keras.applications import VGG19
