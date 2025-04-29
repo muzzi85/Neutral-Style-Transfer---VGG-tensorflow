@@ -1,4 +1,4 @@
-## Generate defects by Generative AI - StyleTransfer (VGG model) - training is inside the code. 
+Generative AI - StyleTransfer (VGG model) - training is inside the code. 
 
 A collection of StyleTransfer implemented in Tensorflow with focus on VGG model. The aim of this project is to provide a quick and simple working example for many of the cool traininale VGG for style transfer and Generate samples out there. All the models are required to be trained on the user dataset of style images. 
 
