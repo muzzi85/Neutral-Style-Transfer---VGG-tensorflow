@@ -3,6 +3,7 @@
 A deep learning framework for artistic neural style transfer using TensorFlow, VGG19 feature extraction, perceptual loss optimization, and differentiable image synthesis.
 <img width="1536" height="1024" alt="image" src="https://github.com/user-attachments/assets/ab1845bc-5d77-4bcb-bc0f-3330c942f7a3" />
 
+
 This project explores how convolutional neural networks can separate and recombine:
 
 * image content
